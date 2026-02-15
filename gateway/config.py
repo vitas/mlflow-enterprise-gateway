@@ -1,0 +1,30 @@
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="GW_", extra="ignore")
+
+    app_name: str = "mlflow-policy-enforcement-gateway"
+    log_level: str = "INFO"
+
+    listen_host: str = "0.0.0.0"
+    listen_port: int = 8000
+
+    target_base_url: str = "http://mlflow:5000"
+    request_timeout_seconds: float = 30.0
+
+    auth_enabled: bool = True
+    auth_mode: str = Field(
+        default="oidc",
+        validation_alias=AliasChoices("GW_AUTH_MODE", "AUTH_MODE"),
+    )
+    oidc_issuer: str | None = None
+    oidc_audience: str | None = None
+    oidc_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
+    jwks_uri: str | None = None
+    jwks_json: str | None = None
+    tenant_claim: str = "tenant_id"
+
+
+settings = Settings()
