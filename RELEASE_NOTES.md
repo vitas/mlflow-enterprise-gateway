@@ -9,7 +9,9 @@
 - Configurable tenant tag key via `TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY`.
 - Minimal RBAC (`viewer`, `contributor`, `admin`) with claim-based mapping and aliases.
 - Audit logging for allowed/denied requests, including RBAC deny audit events.
+- Request correlation IDs (`X-Request-ID`) in responses and audit events.
 - Health endpoint (`/healthz`) and pytest coverage for auth, tenant policy, RBAC, and health checks.
 - Docker Compose local stack (gateway + MLflow + Postgres + MinIO) and runnable demo scripts.
 - Kubernetes/OpenShift gateway-only deployment manifests and a minimal Helm chart.
-- Enterprise-focused docs: integration, RBAC, Kubernetes, and OpenShift architecture guides.
+- Minimal Kubernetes smoke-test workflow (kind/k3d + Helm + tenant-isolation script).
+- Enterprise-focused docs: integration, RBAC, Kubernetes/OpenShift architecture, and Kubernetes smoke-test guide.
