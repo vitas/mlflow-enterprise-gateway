@@ -1,0 +1,12 @@
+image:
+  repository: mlflow-gateway
+  tag: smoke
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: false
+
+env:
+  TARGET_BASE_URL: http://mlflow:5000
+  AUTH_ENABLED: "false"
+  AUTH_MODE: off
