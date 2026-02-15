@@ -90,10 +90,39 @@ curl -sS http://localhost:8000/healthz
 ```mermaid
 flowchart TD
   U[User / Client] --> I[Ingress / Route]
-  I --> G[Gateway (PEP)]
+  I --> G["Gateway (PEP)"]
   G --> M[MLflow Backend]
   G --> A[Audit Log Sink]
 ```
+
+## Kubernetes deployment overview
+
+```mermaid
+flowchart TD
+  U[User / Client] --> I[Ingress Controller]
+  I --> G["Gateway (PEP) Service"]
+  G --> S[Cluster Service]
+  S --> M[MLflow Backend Pod]
+  G --> A[Audit Log Sink]
+```
+
+## Production architecture principles
+
+- Expose only the Gateway via Ingress/Route; keep MLflow internal as `ClusterIP`.
+- Enforce NetworkPolicy so only Gateway pods can reach MLflow service endpoints.
+- Use OIDC mode in production; `AUTH_MODE=off` is for demo/dev only.
+- Enforce tenant isolation at the MLflow API boundary; clients should use the Gateway URL.
+- Capture audit logs with correlation fields such as tenant, subject, path, and status.
+- Set ingress/gateway timeouts and request size limits to protect stability under load.
+- Scale Gateway horizontally (stateless) and manage config via env/ConfigMap/Secret.
+- Terminate TLS at Ingress/Route; consider in-cluster mTLS as a future hardening step.
+
+### Common pitfalls
+
+- Exposing MLflow externally bypasses gateway policy enforcement.
+- Existing resources without expected tenant tags can be denied by tenant checks.
+- Misconfigured role-claim or alias mapping can cause unexpected `403` responses.
+- Clients still pointed to MLflow directly will bypass governance controls.
 
 ## Supported MLflow endpoints (implemented)
 
