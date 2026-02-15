@@ -1,31 +1,37 @@
-# Demo: MLflow Runs Multi-Tenancy (AUTH_MODE=off)
+# Demo: Seeded Multi-Tenant MLflow (AUTH_MODE=off)
 
-This demo proves tenant isolation for MLflow runs through the Policy Enforcement Gateway at `http://localhost:8000`.
+This demo seeds reproducible data through the gateway so MLflow UI is non-empty and tenant isolation can be validated immediately.
 
-Prerequisite:
-
-```bash
-docker compose up --build
-```
-
-Run the demo:
+## One-command seed
 
 ```bash
-./demo/run_demo.sh
+docker compose --profile demo up --build demo-seed
 ```
 
-Optional direct curl helpers:
+This starts `postgres`, `minio`, `mlflow`, `gateway`, and runs one-shot `demo-seed`.
+
+## What gets created
+
+- Tenants: `alpha`, `bravo`
+- Per tenant:
+  - 1 experiment
+  - 2 runs with params/metrics/tags (including tenant tag)
+  - 1 registered model + 1 model version (tenant-tagged)
+
+All writes go through the gateway using `X-Tenant` and `X-Subject`.
+
+## Run smoke test
 
 ```bash
-./demo/curl/create_run.sh
-./demo/curl/get_run_same_tenant.sh <RUN_ID>
-./demo/curl/get_run_other_tenant.sh <RUN_ID>
-./demo/curl/search_other_tenant.sh
+./demo/smoke_test.sh
 ```
 
-Expected results:
+Checks:
 
-- create run: `200`
-- get as same tenant (`team-a`): `200`
-- get as other tenant (`team-b`): `403`
-- search as other tenant (`team-b`): empty run list
+- `alpha` can search its runs
+- `bravo` cannot read an `alpha` run (`403`)
+
+## Useful URLs
+
+- Gateway (governed access): `http://localhost:8000/`
+- MLflow UI direct (local debug): `http://localhost:5001/`
