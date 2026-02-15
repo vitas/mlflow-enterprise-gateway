@@ -88,12 +88,11 @@ curl -sS http://localhost:8000/healthz
 ## Architecture snapshot
 
 ```mermaid
-flowchart LR
-  U[User / SDK / Browser] --> E[Ingress or Route]
-  E --> G[Gateway (PEP)]
-  G --> M[MLflow Service]
-  M --> DB[(Backend DB)]
-  M --> OBJ[(Artifact Store)]
+flowchart TD
+  U[User / Client] --> I[Ingress / Route]
+  I --> G[Gateway (PEP)]
+  G --> M[MLflow Backend]
+  G --> A[Audit Log Sink]
 ```
 
 ## Supported MLflow endpoints (implemented)
