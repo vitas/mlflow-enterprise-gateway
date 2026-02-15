@@ -103,7 +103,7 @@ def test_create_injects_tenant_tag_with_auth_enabled(monkeypatch: pytest.MonkeyP
 
     async def _fake_validate_token(token: str):
         assert token == "token-1"
-        return {"tenant_id": "tenant-a", "sub": "alice"}
+        return {"tenant_id": "tenant-a", "roles": ["contributor"], "sub": "alice"}
 
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "auth_mode", "oidc")

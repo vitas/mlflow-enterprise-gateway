@@ -1,0 +1,27 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/your-org/mlflow-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: nginx
+  host: mlflow-gateway.example.com
+  path: /
+  pathType: Prefix
+
+env:
+  TARGET_BASE_URL: http://mlflow:5000
+  AUTH_ENABLED: "true"
+  AUTH_MODE: oidc
+  OIDC_ISSUER: ""
+  OIDC_AUDIENCE: ""
+  JWKS_URI: ""
+  TENANT_TAG_KEY: tenant

@@ -29,6 +29,7 @@ from gateway.mlflow.tenant import (
     is_runs_get_path,
     is_runs_search_path,
 )
+from gateway.rbac import RBACError, enforce_rbac
 
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -89,6 +90,7 @@ def _load_json_payload(raw_body: bytes) -> dict[str, Any]:
 async def policy_enforcement_gateway_handler(full_path: str, request: Request) -> Response:
     tenant = None
     subject = None
+    claims: dict[str, Any] | None = None
     auth_is_enabled = settings.auth_enabled and settings.auth_mode.lower() != "off"
 
     if auth_is_enabled:
@@ -102,6 +104,25 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
             claims = await _validator.validate_token(token)
             tenant = extract_tenant(claims, settings.tenant_claim)
             subject = claims.get("sub") if isinstance(claims.get("sub"), str) else None
+            try:
+                enforce_rbac(
+                    request.url.path,
+                    claims,
+                    settings.role_claim,
+                    settings.rbac_viewer_aliases,
+                    settings.rbac_contributor_aliases,
+                    settings.rbac_admin_aliases,
+                )
+            except RBACError as exc:
+                log_audit_event(
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=403,
+                    tenant=tenant,
+                    subject=subject,
+                    upstream="rbac",
+                )
+                raise HTTPException(status_code=403, detail=str(exc)) from exc
         except AuthError as exc:
             log_audit_event(
                 method=request.method,

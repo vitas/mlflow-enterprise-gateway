@@ -25,6 +25,22 @@ class Settings(BaseSettings):
     jwks_uri: str | None = None
     jwks_json: str | None = None
     tenant_claim: str = "tenant_id"
+    role_claim: str = Field(
+        default="roles",
+        validation_alias=AliasChoices("GW_ROLE_CLAIM", "ROLE_CLAIM"),
+    )
+    rbac_viewer_aliases: str = Field(
+        default="",
+        validation_alias=AliasChoices("GW_RBAC_VIEWER_ALIASES", "RBAC_VIEWER_ALIASES"),
+    )
+    rbac_contributor_aliases: str = Field(
+        default="",
+        validation_alias=AliasChoices("GW_RBAC_CONTRIBUTOR_ALIASES", "RBAC_CONTRIBUTOR_ALIASES"),
+    )
+    rbac_admin_aliases: str = Field(
+        default="",
+        validation_alias=AliasChoices("GW_RBAC_ADMIN_ALIASES", "RBAC_ADMIN_ALIASES"),
+    )
     tenant_tag_key: str = Field(
         default="tenant",
         validation_alias=AliasChoices("GW_TENANT_TAG_KEY", "TENANT_TAG_KEY"),

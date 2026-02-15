@@ -1,23 +1,28 @@
-# MLflow Multi-Tenancy & RBAC Extension
+# MLflow Multi-Tenancy & Governance Gateway
 
-Policy Enforcement Gateway (extension layer) for MLflow with OIDC JWT validation and structured audit logging.
+This project is a Policy Enforcement Gateway (PEP) for self-hosted MLflow. It sits in front of MLflow UI/API traffic and applies centralized identity, tenant, and governance controls before requests reach MLflow.
 
-## Features
+## Enterprise Gap In Self-Hosted MLflow
 
-- Policy enforcement entrypoint for MLflow API/UI traffic (`httpx`)
-- OIDC JWT validation against JWKS (`PyJWT`)
-- Tenant extraction from configurable claim
-- JSON audit logs per request
-- Local demo stack with `docker compose` (gateway + mlflow + postgres + minio)
+Out of the box, self-hosted MLflow typically provides:
 
-## Why
+- no multi-tenancy isolation controls
+- no built-in RBAC enforcement boundary
+- no centralized audit policy layer
+- limited IAM integration patterns for enterprise SSO/JWT workflows
 
-MLflow is strong for experimentation and model lifecycle management, but enterprise teams usually need an extension layer for:
+## How This Project Addresses The Gap
 
-- Tenant isolation boundaries across teams/business units
-- RBAC enforcement aligned to corporate IAM claims
-- Auditable request trails for compliance and forensics
-- Centralized IAM integration without modifying core MLflow
+- Enforces access policy at a dedicated gateway (PEP), without forking MLflow.
+- Applies tenant-aware request controls for API operations.
+- Adds structured audit logging at the control point.
+- Integrates with OIDC/JWT-based identity flows.
+
+## Key Benefits
+
+- DB-agnostic: works as an extension layer regardless of MLflow backend store.
+- Kubernetes-native: designed for gateway-only exposure patterns in K8s/OpenShift.
+- No MLflow fork: keeps upstream MLflow intact and upgrade-friendly.
 
 ## Requirements
 
@@ -74,6 +79,21 @@ curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/
 - MLflow remains the control/data plane service behind the extension layer.
 - Optional OPA (or another policy engine) can be introduced as the Policy Decision Point (PDP) for externalized authorization decisions.
 - In the current MVP, authorization logic is local to the gateway process; PDP integration is an extension point.
+
+## Docs
+
+- Integration guide: `docs/integration.md`
+- RBAC guide: `docs/rbac.md`
+- Kubernetes architecture: `docs/kubernetes-architecture.md`
+- OpenShift architecture: `docs/openshift-architecture.md`
+
+## Kubernetes: gateway-only access
+
+Use `docs/kubernetes-architecture.md` and `deploy/k8s/` to expose only the gateway via Ingress while keeping MLflow private (`ClusterIP` + NetworkPolicy).
+
+## OpenShift deployment: enforce gateway-only access
+
+Use the OpenShift architecture and manifests in `docs/openshift-architecture.md` and `deploy/openshift/` to expose only the gateway via Route while keeping MLflow private (`ClusterIP` + NetworkPolicy).
 
 ## Configuration (env vars)
 

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-gateway
+  labels:
+    app: gateway
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: gateway
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: gateway
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              name: http
+          env:
+            - name: GW_TARGET_BASE_URL
+              value: {{ .Values.env.TARGET_BASE_URL | quote }}
+            - name: GW_AUTH_ENABLED
+              value: {{ .Values.env.AUTH_ENABLED | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.env.AUTH_MODE | quote }}
+            - name: GW_OIDC_ISSUER
+              value: {{ .Values.env.OIDC_ISSUER | quote }}
+            - name: GW_OIDC_AUDIENCE
+              value: {{ .Values.env.OIDC_AUDIENCE | quote }}
+            - name: GW_JWKS_URI
+              value: {{ .Values.env.JWKS_URI | quote }}
+            - name: TENANT_TAG_KEY
+              value: {{ .Values.env.TENANT_TAG_KEY | quote }}
