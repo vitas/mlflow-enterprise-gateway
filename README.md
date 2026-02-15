@@ -1,84 +1,98 @@
 # MLflow Multi-Tenancy & Governance Gateway
 
-This project is a Policy Enforcement Gateway (PEP) for self-hosted MLflow. It sits in front of MLflow UI/API traffic and applies centralized identity, tenant, and governance controls before requests reach MLflow.
+Policy Enforcement Gateway (PEP) for self-hosted MLflow. It adds tenant isolation, RBAC, audit logging, and OIDC-based IAM integration without modifying MLflow itself. The gateway sits in front of MLflow API/UI traffic and enforces policy before requests reach MLflow.
 
-## Enterprise Gap In Self-Hosted MLflow
+Self-hosted MLflow is strong for experiment tracking, but it does not provide enterprise multi-tenancy boundaries, built-in RBAC enforcement, centralized audit control, or robust IAM integration patterns out of the box. This project addresses that gap with an extension-layer gateway.
 
-Out of the box, self-hosted MLflow typically provides:
+## Why this exists
 
-- no multi-tenancy isolation controls
-- no built-in RBAC enforcement boundary
-- no centralized audit policy layer
-- limited IAM integration patterns for enterprise SSO/JWT workflows
+- Problem:
+  - no tenant isolation control point
+  - no role-based authorization boundary
+  - no centralized audit decision logs
+  - weak IAM integration for enterprise SSO/JWT flows
+- Solution:
+  - place a dedicated PEP in front of MLflow
+  - enforce authn/authz/tenant policy at request time
+  - keep MLflow upstream intact (no fork, no MLflow code patching)
 
-## How This Project Addresses The Gap
+## Key features
 
-- Enforces access policy at a dedicated gateway (PEP), without forking MLflow.
-- Applies tenant-aware request controls for API operations.
-- Adds structured audit logging at the control point.
-- Integrates with OIDC/JWT-based identity flows.
-
-## Key Benefits
-
-- DB-agnostic: works as an extension layer regardless of MLflow backend store.
-- Kubernetes-native: designed for gateway-only exposure patterns in K8s/OpenShift.
-- No MLflow fork: keeps upstream MLflow intact and upgrade-friendly.
-
-## Requirements
-
-- Python 3.11+
-- Docker + Docker Compose plugin
+- Tenant isolation for MLflow Runs and Model Registry MVP endpoints.
+- Minimal RBAC (`viewer`, `contributor`, `admin`) enforced in OIDC mode.
+- OIDC JWT validation with configurable tenant and role claim mapping.
+- Structured audit logging, including deny events.
+- Configurable tenant tag key (`TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY`).
+- Kubernetes/OpenShift gateway-only deployment manifests and minimal Helm chart.
 
 ## Quickstart
 
-### 1. Run unit tests
+### 1) Clone and install
 
 ```bash
+git clone https://github.com/<your-org>/mlflow-enterprise-gateway.git
+cd mlflow-enterprise-gateway
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
+```
+
+### 2) Run tests
+
+```bash
 pytest -q
 ```
 
-### 2. Start local demo stack
+### 3) Start local stack
 
 ```bash
 docker compose up --build
 ```
 
-Services:
-
-- Gateway: `http://localhost:8000`
-- MLflow UI/API (direct): `http://localhost:5001`
-- MinIO console: `http://localhost:9001`
-
-Example via gateway:
+### 4) Smoke check
 
 ```bash
-curl http://localhost:8000/healthz
-curl http://localhost:8000/api/2.0/mlflow/experiments/list
+curl -sS http://localhost:8000/healthz
 ```
 
-### AUTH_MODE=off tenant isolation demo (runs)
+## Authentication modes
 
-Start gateway with auth disabled (`GW_AUTH_ENABLED=false` or `AUTH_MODE=off`), then run:
+- `AUTH_MODE=oidc` (production):
+  - validates JWTs via OIDC/JWKS
+  - tenant is extracted from JWT claim (`GW_TENANT_CLAIM`)
+  - RBAC enforced from claims (`GW_ROLE_CLAIM` and aliases)
+  - `X-Tenant` header is rejected
+- `AUTH_MODE=off` (dev/demo):
+  - JWT validation bypassed
+  - `X-Tenant` required, `X-Subject` optional
+  - `Authorization` ignored and not forwarded upstream
+  - useful for local tenant-isolation demos only
 
-```bash
-export GW=http://localhost:8000
-RUN_A=$(curl -sS -X POST "$GW/api/2.0/mlflow/runs/create" -H "Content-Type: application/json" -H "X-Tenant: team-a" -H "X-Subject: alice" -d '{"experiment_id":"0","tags":[{"key":"demo_case","value":"multi-tenant"}]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['run']['info']['run_id'])")
-RUN_B=$(curl -sS -X POST "$GW/api/2.0/mlflow/runs/create" -H "Content-Type: application/json" -H "X-Tenant: team-b" -H "X-Subject: bob" -d '{"experiment_id":"0","tags":[{"key":"demo_case","value":"multi-tenant"}]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['run']['info']['run_id'])")
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: team-a" -H "X-Subject: alice" -d "{\"run_id\":\"$RUN_A\"}"
-curl -i -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: team-b" -H "X-Subject: bob" -d "{\"run_id\":\"$RUN_A\"}"
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: team-a" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''multi-tenant'\''"}'
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: team-b" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''multi-tenant'\''"}'
+## Architecture snapshot
+
+```mermaid
+flowchart LR
+  U[User / SDK / Browser] --> E[Ingress or Route]
+  E --> G[Gateway (PEP)]
+  G --> M[MLflow Service]
+  M --> DB[(Backend DB)]
+  M --> OBJ[(Artifact Store)]
 ```
 
-## Architecture
+## Supported MLflow endpoints (implemented)
 
-- `gateway` is the Policy Enforcement Point (PEP): it authenticates JWTs, extracts tenant context, and records audit events.
-- MLflow remains the control/data plane service behind the extension layer.
-- Optional OPA (or another policy engine) can be introduced as the Policy Decision Point (PDP) for externalized authorization decisions.
-- In the current MVP, authorization logic is local to the gateway process; PDP integration is an extension point.
+Tenant policy and RBAC are currently enforced for:
+
+- Runs:
+  - `/api/2.0/mlflow/runs/create` and `/api/2.1/mlflow/runs/create`
+  - `/api/2.0/mlflow/runs/get` and `/api/2.1/mlflow/runs/get`
+  - `/api/2.0/mlflow/runs/search` and `/api/2.1/mlflow/runs/search`
+- Model Registry:
+  - `/api/2.0/mlflow/registered-models/create` and `/api/2.1/mlflow/registered-models/create`
+  - `/api/2.0/mlflow/registered-models/get` and `/api/2.1/mlflow/registered-models/get`
+  - `/api/2.0/mlflow/registered-models/search` and `/api/2.1/mlflow/registered-models/search`
+  - `/api/2.0/mlflow/model-versions/create` and `/api/2.1/mlflow/model-versions/create`
+  - `/api/2.0/mlflow/model-versions/get` and `/api/2.1/mlflow/model-versions/get`
 
 ## Docs
 
@@ -87,63 +101,13 @@ curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/
 - Kubernetes architecture: `docs/kubernetes-architecture.md`
 - OpenShift architecture: `docs/openshift-architecture.md`
 
-## Kubernetes: gateway-only access
+## Roadmap
 
-Use `docs/kubernetes-architecture.md` and `deploy/k8s/` to expose only the gateway via Ingress while keeping MLflow private (`ClusterIP` + NetworkPolicy).
+See `ROADMAP.md` for next-release scope and v0.1 completion criteria.
 
-## OpenShift deployment: enforce gateway-only access
+## Support and community
 
-Use the OpenShift architecture and manifests in `docs/openshift-architecture.md` and `deploy/openshift/` to expose only the gateway via Route while keeping MLflow private (`ClusterIP` + NetworkPolicy).
+Issues and PRs are welcome. For bug reports, feature requests, and security guidance, use:
 
-## Configuration (env vars)
-
-All gateway settings use `GW_` prefix.
-
-- `GW_TARGET_BASE_URL` (default: `http://mlflow:5000`)
-- `GW_AUTH_ENABLED` (`true`/`false`, default: `true`)
-- `GW_AUTH_MODE` / `AUTH_MODE` (`off` disables JWT validation for local development)
-- `GW_OIDC_ISSUER` (optional)
-- `GW_OIDC_AUDIENCE` (optional)
-- `GW_OIDC_ALGORITHMS` (default: `["RS256"]`)
-- `GW_JWKS_URI` (optional if `GW_JWKS_JSON` set)
-- `GW_JWKS_JSON` (inline JWKS JSON; useful for tests)
-- `GW_TENANT_CLAIM` (default: `tenant_id`)
-- `TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY` (default: `tenant`)
-- `GW_LOG_LEVEL` (default: `INFO`)
-
-Auth mode behavior:
-- `AUTH_MODE=off` (or `GW_AUTH_ENABLED=false`): JWT auth is bypassed, `Authorization` header is ignored, `X-Tenant` is required, and `X-Subject` is optional.
-- `AUTH_MODE=oidc` with `GW_AUTH_ENABLED=true`: tenant is derived only from validated JWT claims; `X-Tenant` header is rejected with `400`.
-
-## OIDC mode example
-
-Set these when enabling auth:
-
-```bash
-export GW_AUTH_ENABLED=true
-export GW_OIDC_ISSUER=https://issuer.example.com/
-export GW_OIDC_AUDIENCE=mlflow-gateway
-export GW_JWKS_URI=https://issuer.example.com/.well-known/jwks.json
-```
-
-Then run:
-
-```bash
-uvicorn gateway.main:app --host 0.0.0.0 --port 8000
-```
-
-## Project layout
-
-```text
-gateway/
-  config.py
-  auth.py
-  audit.py
-  main.py
-tests/
-  test_jwt.py
-  test_tenant.py
-Dockerfile
-docker-compose.yml
-docker/mlflow.Dockerfile
-```
+- `CONTRIBUTING.md`
+- `SECURITY.md`
