@@ -5,6 +5,7 @@ from gateway.mlflow.tenant import (
     extract_tenant_tag_from_registered_model_response,
     extract_tenant_tag_from_run_response,
     ensure_tenant_tag_for_create,
+    tenant_filter_clause,
 )
 
 
@@ -38,3 +39,12 @@ def test_extract_tenant_tag_from_registered_model_response_supports_dict_tags():
 def test_extract_tenant_tag_from_model_version_response_supports_dict_tags():
     payload = {"model_version": {"tags": {"tenant": "tenant-a"}}}
     assert extract_tenant_tag_from_model_version_response(payload) == "tenant-a"
+
+
+def test_custom_tenant_tag_key_is_used_for_write_filter_and_extract():
+    payload = {"tags": {"workspace": "tenant-a"}}
+    updated = ensure_tenant_tag_for_create(payload, "tenant-a", tenant_tag_key="workspace")
+    assert {"key": "workspace", "value": "tenant-a"} in updated["tags"]
+    assert tenant_filter_clause("tenant-a", tenant_tag_key="workspace") == "tags.workspace = 'tenant-a'"
+    run_payload = {"run": {"data": {"tags": {"workspace": "tenant-a"}}}}
+    assert extract_tenant_tag_from_run_response(run_payload, tenant_tag_key="workspace") == "tenant-a"

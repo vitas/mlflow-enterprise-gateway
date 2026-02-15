@@ -136,7 +136,7 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
     ):
         payload = _load_json_payload(body)
         try:
-            payload = ensure_tenant_tag_for_create(payload, tenant)
+            payload = ensure_tenant_tag_for_create(payload, tenant, settings.tenant_tag_key)
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except TenantPayloadError as exc:
@@ -145,14 +145,16 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
     elif is_runs_search_path(request_path):
         payload = _load_json_payload(body)
         try:
-            payload = ensure_tenant_filter_for_search(payload, tenant)
+            payload = ensure_tenant_filter_for_search(payload, tenant, settings.tenant_tag_key)
         except TenantPayloadError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         body = json.dumps(payload).encode()
     elif is_registered_models_search_path(request_path):
         payload = _load_json_payload(body)
         try:
-            payload = ensure_tenant_filter_for_registered_models_search(payload, tenant)
+            payload = ensure_tenant_filter_for_registered_models_search(
+                payload, tenant, settings.tenant_tag_key
+            )
         except TenantPayloadError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         body = json.dumps(payload).encode()
@@ -162,11 +164,17 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
         response_tenant_extractor = None
         if is_runs_get_path(request_path):
-            response_tenant_extractor = extract_tenant_tag_from_run_response
+            response_tenant_extractor = lambda payload: extract_tenant_tag_from_run_response(
+                payload, settings.tenant_tag_key
+            )
         elif is_registered_model_get_path(request_path):
-            response_tenant_extractor = extract_tenant_tag_from_registered_model_response
+            response_tenant_extractor = lambda payload: extract_tenant_tag_from_registered_model_response(
+                payload, settings.tenant_tag_key
+            )
         elif is_model_version_get_path(request_path):
-            response_tenant_extractor = extract_tenant_tag_from_model_version_response
+            response_tenant_extractor = lambda payload: extract_tenant_tag_from_model_version_response(
+                payload, settings.tenant_tag_key
+            )
 
         if response_tenant_extractor is not None:
             preflight_response = await client.request(

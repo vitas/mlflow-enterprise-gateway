@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     jwks_uri: str | None = None
     jwks_json: str | None = None
     tenant_claim: str = "tenant_id"
+    tenant_tag_key: str = Field(
+        default="tenant",
+        validation_alias=AliasChoices("GW_TENANT_TAG_KEY", "TENANT_TAG_KEY"),
+    )
 
 
 settings = Settings()

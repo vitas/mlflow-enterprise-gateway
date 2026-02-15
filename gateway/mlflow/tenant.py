@@ -22,16 +22,16 @@ def _normalize_tags_to_list(tags: Any) -> list[dict[str, Any]]:
     raise TenantPayloadError("Invalid MLflow payload: tags must be a list or object")
 
 
-def _extract_tenant_from_tags(tags: Any) -> str | None:
+def _extract_tenant_from_tags(tags: Any, tenant_tag_key: str = "tenant") -> str | None:
     if isinstance(tags, list):
         for tag in tags:
-            if isinstance(tag, dict) and tag.get("key") == "tenant":
+            if isinstance(tag, dict) and tag.get("key") == tenant_tag_key:
                 value = tag.get("value")
                 if isinstance(value, str):
                     return value
         return None
     if isinstance(tags, dict):
-        value = tags.get("tenant")
+        value = tags.get(tenant_tag_key)
         if isinstance(value, str):
             return value
         return None
@@ -85,30 +85,34 @@ def is_model_version_get_path(path: str) -> bool:
     }
 
 
-def ensure_tenant_tag_for_create(payload: dict[str, Any], tenant: str) -> dict[str, Any]:
+def ensure_tenant_tag_for_create(
+    payload: dict[str, Any], tenant: str, tenant_tag_key: str = "tenant"
+) -> dict[str, Any]:
     tags = _normalize_tags_to_list(payload.get("tags"))
 
     tenant_tag_found = False
     for tag in tags:
-        if tag.get("key") == "tenant":
+        if tag.get("key") == tenant_tag_key:
             tenant_tag_found = True
             if tag.get("value") != tenant:
                 raise PermissionError("Tenant tag conflict")
 
     if not tenant_tag_found:
-        tags.append({"key": "tenant", "value": tenant})
+        tags.append({"key": tenant_tag_key, "value": tenant})
 
     payload["tags"] = tags
     return payload
 
 
-def tenant_filter_clause(tenant: str) -> str:
+def tenant_filter_clause(tenant: str, tenant_tag_key: str = "tenant") -> str:
     safe_tenant = tenant.replace("'", "''")
-    return f"tags.tenant = '{safe_tenant}'"
+    return f"tags.{tenant_tag_key} = '{safe_tenant}'"
 
 
-def ensure_tenant_filter_for_search(payload: dict[str, Any], tenant: str) -> dict[str, Any]:
-    clause = tenant_filter_clause(tenant)
+def ensure_tenant_filter_for_search(
+    payload: dict[str, Any], tenant: str, tenant_tag_key: str = "tenant"
+) -> dict[str, Any]:
+    clause = tenant_filter_clause(tenant, tenant_tag_key)
     raw_filter = payload.get("filter")
 
     if raw_filter is None:
@@ -132,9 +136,9 @@ def ensure_tenant_filter_for_search(payload: dict[str, Any], tenant: str) -> dic
 
 
 def ensure_tenant_filter_for_registered_models_search(
-    payload: dict[str, Any], tenant: str
+    payload: dict[str, Any], tenant: str, tenant_tag_key: str = "tenant"
 ) -> dict[str, Any]:
-    clause = tenant_filter_clause(tenant)
+    clause = tenant_filter_clause(tenant, tenant_tag_key)
     raw_filter = payload.get("filter_string")
 
     if raw_filter is None:
@@ -157,25 +161,31 @@ def ensure_tenant_filter_for_registered_models_search(
     return payload
 
 
-def extract_tenant_tag_from_run_response(payload: dict[str, Any]) -> str | None:
+def extract_tenant_tag_from_run_response(
+    payload: dict[str, Any], tenant_tag_key: str = "tenant"
+) -> str | None:
     run = payload.get("run")
     if not isinstance(run, dict):
         return None
     data = run.get("data")
     if not isinstance(data, dict):
         return None
-    return _extract_tenant_from_tags(data.get("tags"))
+    return _extract_tenant_from_tags(data.get("tags"), tenant_tag_key)
 
 
-def extract_tenant_tag_from_registered_model_response(payload: dict[str, Any]) -> str | None:
+def extract_tenant_tag_from_registered_model_response(
+    payload: dict[str, Any], tenant_tag_key: str = "tenant"
+) -> str | None:
     registered_model = payload.get("registered_model")
     if not isinstance(registered_model, dict):
         return None
-    return _extract_tenant_from_tags(registered_model.get("tags"))
+    return _extract_tenant_from_tags(registered_model.get("tags"), tenant_tag_key)
 
 
-def extract_tenant_tag_from_model_version_response(payload: dict[str, Any]) -> str | None:
+def extract_tenant_tag_from_model_version_response(
+    payload: dict[str, Any], tenant_tag_key: str = "tenant"
+) -> str | None:
     model_version = payload.get("model_version")
     if not isinstance(model_version, dict):
         return None
-    return _extract_tenant_from_tags(model_version.get("tags"))
+    return _extract_tenant_from_tags(model_version.get("tags"), tenant_tag_key)

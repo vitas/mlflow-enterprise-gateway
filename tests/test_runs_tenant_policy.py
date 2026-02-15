@@ -14,6 +14,7 @@ def _configure_gateway(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "auth_enabled", False)
     monkeypatch.setattr(settings, "auth_mode", "oidc")
     monkeypatch.setattr(settings, "target_base_url", "http://mlflow:5000")
+    monkeypatch.setattr(settings, "tenant_tag_key", "tenant")
 
 
 def test_create_injects_tenant_tag():
@@ -120,6 +121,27 @@ def test_create_injects_tenant_tag_with_auth_enabled(monkeypatch: pytest.MonkeyP
             "/api/2.0/mlflow/runs/create",
             json={"experiment_id": "1"},
             headers={"Authorization": "Bearer token-1"},
+        )
+
+    assert response.status_code == 200
+
+
+def test_create_uses_configured_tenant_tag_key(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "tenant_tag_key", "workspace")
+
+    with respx.mock(assert_all_called=True) as mock:
+        def _assert_request(request: httpx.Request) -> httpx.Response:
+            payload = json.loads(request.content)
+            assert {"key": "workspace", "value": "tenant-a"} in payload["tags"]
+            assert {"key": "tenant", "value": "tenant-a"} not in payload["tags"]
+            return httpx.Response(200, json={"run": {"info": {"run_id": "r-3"}}})
+
+        mock.post("http://mlflow:5000/api/2.0/mlflow/runs/create").mock(side_effect=_assert_request)
+        client = TestClient(app)
+        response = client.post(
+            "/api/2.0/mlflow/runs/create",
+            json={"experiment_id": "1"},
+            headers={"X-Tenant": "tenant-a"},
         )
 
     assert response.status_code == 200

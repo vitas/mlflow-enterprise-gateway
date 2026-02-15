@@ -60,16 +60,13 @@ Start gateway with auth disabled (`GW_AUTH_ENABLED=false` or `AUTH_MODE=off`), t
 
 ```bash
 export GW=http://localhost:8000
-RUN_ID=$(curl -sS -X POST "$GW/api/2.0/mlflow/runs/create" -H "Content-Type: application/json" -H "X-Tenant: tenant-a" -H "X-Subject: alice" -d '{"experiment_id":"0","tags":[{"key":"demo_case","value":"tenant-isolation"}]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['run']['info']['run_id'])")
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: tenant-a" -H "X-Subject: alice" -d "{\"run_id\":\"$RUN_ID\"}"
-curl -i -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: tenant-b" -H "X-Subject: bob" -d "{\"run_id\":\"$RUN_ID\"}"
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: tenant-a" -H "X-Subject: alice" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''tenant-isolation'\''"}'
-curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: tenant-b" -H "X-Subject: bob" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''tenant-isolation'\''"}'
+RUN_A=$(curl -sS -X POST "$GW/api/2.0/mlflow/runs/create" -H "Content-Type: application/json" -H "X-Tenant: team-a" -H "X-Subject: alice" -d '{"experiment_id":"0","tags":[{"key":"demo_case","value":"multi-tenant"}]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['run']['info']['run_id'])")
+RUN_B=$(curl -sS -X POST "$GW/api/2.0/mlflow/runs/create" -H "Content-Type: application/json" -H "X-Tenant: team-b" -H "X-Subject: bob" -d '{"experiment_id":"0","tags":[{"key":"demo_case","value":"multi-tenant"}]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['run']['info']['run_id'])")
+curl -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: team-a" -H "X-Subject: alice" -d "{\"run_id\":\"$RUN_A\"}"
+curl -i -sS -X POST "$GW/api/2.0/mlflow/runs/get" -H "Content-Type: application/json" -H "X-Tenant: team-b" -H "X-Subject: bob" -d "{\"run_id\":\"$RUN_A\"}"
+curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: team-a" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''multi-tenant'\''"}'
+curl -sS -X POST "$GW/api/2.0/mlflow/runs/search" -H "Content-Type: application/json" -H "X-Tenant: team-b" -d '{"experiment_ids":["0"],"filter":"tags.demo_case = '\''multi-tenant'\''"}'
 ```
-
-Expected behavior:
-- tenant-a can create/get/search its run.
-- tenant-b gets `403` on `runs/get` for tenant-a run and does not see it in `runs/search`.
 
 ## Architecture
 
@@ -91,6 +88,7 @@ All gateway settings use `GW_` prefix.
 - `GW_JWKS_URI` (optional if `GW_JWKS_JSON` set)
 - `GW_JWKS_JSON` (inline JWKS JSON; useful for tests)
 - `GW_TENANT_CLAIM` (default: `tenant_id`)
+- `TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY` (default: `tenant`)
 - `GW_LOG_LEVEL` (default: `INFO`)
 
 Auth mode behavior:

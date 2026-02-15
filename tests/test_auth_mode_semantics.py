@@ -10,6 +10,7 @@ from gateway.main import app
 @pytest.fixture(autouse=True)
 def _configure_gateway(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "target_base_url", "http://mlflow:5000")
+    monkeypatch.setattr(settings, "tenant_tag_key", "tenant")
 
 
 def test_authorization_ignored_in_auth_mode_off(monkeypatch: pytest.MonkeyPatch, caplog):

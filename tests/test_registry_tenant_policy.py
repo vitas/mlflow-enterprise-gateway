@@ -14,6 +14,7 @@ def _configure_gateway(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "auth_enabled", False)
     monkeypatch.setattr(settings, "auth_mode", "oidc")
     monkeypatch.setattr(settings, "target_base_url", "http://mlflow:5000")
+    monkeypatch.setattr(settings, "tenant_tag_key", "tenant")
 
 
 def test_registered_model_create_injects_tenant_tag():
