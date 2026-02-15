@@ -71,6 +71,22 @@ docker compose up --build
 
 ```bash
 curl -sS http://localhost:8000/healthz
+curl -sS http://localhost:8000/readyz
+```
+
+`/healthz` is a liveness probe (process is running). `/readyz` is a readiness probe and returns `200` only when MLflow upstream is reachable (`503` otherwise).
+
+Kubernetes probe example:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: 8000
 ```
 
 ## Authentication modes
@@ -144,6 +160,7 @@ Tenant policy and RBAC are currently enforced for:
 
 - Integration guide: `docs/integration.md`
 - RBAC guide: `docs/rbac.md`
+- Audit schema guide: `docs/audit.md`
 - Kubernetes architecture: `docs/kubernetes-architecture.md`
 - OpenShift architecture: `docs/openshift-architecture.md`
 

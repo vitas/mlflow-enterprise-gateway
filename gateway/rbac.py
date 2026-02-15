@@ -105,9 +105,12 @@ def enforce_rbac(
     viewer_aliases: str = "",
     contributor_aliases: str = "",
     admin_aliases: str = "",
+    default_deny: bool = False,
 ) -> None:
     required = required_role_for_request(path)
     if required is None:
+        if default_deny:
+            raise RBACError(f"RBAC default deny: endpoint not covered by policy: {path}")
         return
 
     effective = extract_effective_role(

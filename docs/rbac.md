@@ -56,6 +56,19 @@ It supports a single claim key or CSV list, for example:
 
 Gateway reads all configured claims and computes the strongest recognized role.
 
+## Default-deny mode
+
+Configuration:
+
+- `GW_RBAC_DEFAULT_DENY` (default: `false`)
+
+Behavior:
+
+- `false` (default): endpoints not covered by RBAC mapping are allowed.
+- `true`: endpoints not covered by RBAC mapping are denied with `403`.
+
+Use `true` when you want strict policy coverage enforcement at the gateway boundary.
+
 ## Role Alias Mapping
 
 Map IdP role/group names to internal roles using CSV aliases:
@@ -140,3 +153,11 @@ Common error messages:
   - Claim keys existed, but values did not map to `viewer`/`contributor`/`admin`.
 - `Insufficient role: required contributor, got viewer`
   - Caller role resolved correctly but is too weak for endpoint.
+- `RBAC default deny: endpoint not covered by policy: <path>`
+  - `GW_RBAC_DEFAULT_DENY=true` and the path is not mapped in current RBAC endpoint coverage.
+
+## Endpoint coverage and extension
+
+- Endpoint coverage is defined in gateway path matchers and role mapping logic.
+- To extend RBAC coverage, add path matcher support for the endpoint and map it to a minimum role.
+- Keep coverage changes explicit and test-backed to avoid unintentional authorization drift.

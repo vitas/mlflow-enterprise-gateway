@@ -1,6 +1,18 @@
-# Release Notes (v0.1.0)
+# Release Notes
 
-## Implemented features
+## v0.2.0
+
+- Added `/readyz` endpoint for readiness checks against MLflow upstream reachability.
+- `/healthz` remains a simple liveness endpoint.
+- Added readiness unit tests for reachable and unavailable upstream scenarios.
+- Updated README with `/healthz` vs `/readyz` behavior and Kubernetes probe example.
+- Bumped project and Helm chart version to `0.2.0`.
+- Introduced structured audit schema v1 (`schema_version`, `request_id`, `decision`, optional `reason`) for SIEM-friendly logs.
+- Added optional `GW_RBAC_DEFAULT_DENY` mode to deny unknown API paths with `403`.
+- Added audit schema and default-deny test coverage.
+- Added audit documentation in `docs/audit.md` and updated RBAC docs for default-deny behavior.
+
+## v0.1.0
 
 - FastAPI Policy Enforcement Gateway for MLflow with upstream forwarding via `httpx`.
 - OIDC mode with JWT validation, tenant extraction from claims, and strict header semantics.

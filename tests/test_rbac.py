@@ -61,3 +61,14 @@ def test_enforce_rbac_denies_missing_role_claim():
     claims = {"tenant_id": "team-a"}
     with pytest.raises(RBACError, match="Missing role claim"):
         enforce_rbac("/api/2.0/mlflow/runs/get", claims, "roles")
+
+
+def test_enforce_rbac_default_deny_blocks_unknown_endpoint():
+    claims = {"roles": ["admin"]}
+    with pytest.raises(RBACError, match="default deny"):
+        enforce_rbac("/api/2.0/mlflow/experiments/list", claims, "roles", default_deny=True)
+
+
+def test_enforce_rbac_unknown_endpoint_allowed_when_default_deny_disabled():
+    claims = {"roles": ["viewer"]}
+    enforce_rbac("/api/2.0/mlflow/experiments/list", claims, "roles", default_deny=False)

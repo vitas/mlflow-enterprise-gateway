@@ -53,8 +53,24 @@ _validator = JWTValidator(
 
 
 @app.get("/healthz")
-async def healthz() -> dict[str, str]:
+async def healthz(request: Request) -> dict[str, str]:
+    request.state.audit_upstream = "policy"
+    _log_request_audit(request, status_code=200)
     return {"status": "ok"}
+
+
+@app.get("/readyz")
+async def readyz(request: Request) -> dict[str, str]:
+    probe_url = f"{settings.target_base_url.rstrip('/')}/"
+    request.state.audit_upstream = probe_url
+    timeout = httpx.Timeout(min(settings.request_timeout_seconds, 2.0))
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            await client.get(probe_url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Upstream MLflow is unavailable") from exc
+    _log_request_audit(request, status_code=200, upstream=probe_url)
+    return {"status": "ready"}
 
 
 @app.middleware("http")
@@ -66,8 +82,41 @@ async def request_id_middleware(request: Request, call_next):
     return response
 
 
+def _decision_for_status(status_code: int) -> str:
+    if status_code >= 500:
+        return "error"
+    if status_code >= 400:
+        return "deny"
+    return "allow"
+
+
+def _log_request_audit(
+    request: Request,
+    *,
+    status_code: int,
+    reason: str | None = None,
+    upstream: str | None = None,
+) -> None:
+    request_id = getattr(request.state, "request_id", None)
+    tenant = getattr(request.state, "audit_tenant", None)
+    subject = getattr(request.state, "audit_subject", None)
+    resolved_upstream = upstream or getattr(request.state, "audit_upstream", "policy")
+    log_audit_event(
+        method=request.method,
+        path=request.url.path,
+        status_code=status_code,
+        request_id=request_id if isinstance(request_id, str) else None,
+        tenant=tenant if isinstance(tenant, str) else None,
+        subject=subject if isinstance(subject, str) else None,
+        upstream=resolved_upstream if isinstance(resolved_upstream, str) else "policy",
+        decision=_decision_for_status(status_code),
+        reason=reason,
+    )
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    _log_request_audit(request, status_code=exc.status_code, reason=str(exc.detail))
     headers = dict(exc.headers or {})
     request_id = getattr(request.state, "request_id", None)
     if isinstance(request_id, str):
@@ -78,6 +127,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled gateway exception", exc_info=exc)
+    _log_request_audit(request, status_code=500, reason="internal_error")
     request_id = getattr(request.state, "request_id", None)
     headers = {"X-Request-ID": request_id} if isinstance(request_id, str) else {}
     return JSONResponse(
@@ -120,14 +170,15 @@ def _load_json_payload(raw_body: bytes) -> dict[str, Any]:
 @app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def policy_enforcement_gateway_handler(full_path: str, request: Request) -> Response:
-    request_id = getattr(request.state, "request_id", None)
     tenant = None
     subject = None
     claims: dict[str, Any] | None = None
     auth_is_enabled = settings.auth_enabled and settings.auth_mode.lower() != "off"
+    request.state.audit_upstream = "policy"
 
     if auth_is_enabled:
         if request.headers.get("x-tenant"):
+            request.state.audit_upstream = "auth"
             raise HTTPException(
                 status_code=400,
                 detail="X-Tenant header is not allowed when AUTH_MODE=oidc",
@@ -137,6 +188,8 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
             claims = await _validator.validate_token(token)
             tenant = extract_tenant(claims, settings.tenant_claim)
             subject = claims.get("sub") if isinstance(claims.get("sub"), str) else None
+            request.state.audit_tenant = tenant
+            request.state.audit_subject = subject
             try:
                 enforce_rbac(
                     request.url.path,
@@ -145,36 +198,24 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
                     settings.rbac_viewer_aliases,
                     settings.rbac_contributor_aliases,
                     settings.rbac_admin_aliases,
+                    settings.rbac_default_deny,
                 )
             except RBACError as exc:
-                log_audit_event(
-                    method=request.method,
-                    path=request.url.path,
-                    status_code=403,
-                    request_id=request_id if isinstance(request_id, str) else None,
-                    tenant=tenant,
-                    subject=subject,
-                    upstream="rbac",
-                )
+                request.state.audit_upstream = "policy"
                 raise HTTPException(status_code=403, detail=str(exc)) from exc
         except AuthError as exc:
-            log_audit_event(
-                method=request.method,
-                path=request.url.path,
-                status_code=401,
-                request_id=request_id if isinstance(request_id, str) else None,
-                tenant=None,
-                subject=None,
-                upstream="auth",
-            )
+            request.state.audit_upstream = "auth"
             raise HTTPException(status_code=401, detail=str(exc)) from exc
     else:
         if _has_authorization_header(request):
             logger.warning("Authorization header ignored because AUTH_MODE=off")
         tenant = _require_tenant_from_headers(request)
         subject = _optional_subject_from_headers(request)
+        request.state.audit_tenant = tenant
+        request.state.audit_subject = subject
 
     upstream_url = f"{settings.target_base_url.rstrip('/')}/{full_path}"
+    request.state.audit_upstream = upstream_url
 
     forward_headers = dict(request.headers)
     forward_headers.pop("host", None)
@@ -263,13 +304,10 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
         k: v for k, v in upstream_response.headers.items() if k.lower() not in excluded
     }
 
-    log_audit_event(
-        method=request.method,
-        path=request.url.path,
+    _log_request_audit(
+        request,
         status_code=upstream_response.status_code,
-        request_id=request_id if isinstance(request_id, str) else None,
-        tenant=tenant,
-        subject=subject,
+        reason="upstream_server_error" if upstream_response.status_code >= 500 else None,
         upstream=upstream_url,
     )
 

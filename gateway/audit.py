@@ -17,15 +17,21 @@ def log_audit_event(
     tenant: str | None,
     subject: str | None,
     upstream: str,
+    decision: str,
+    reason: str | None = None,
 ) -> None:
     event = {
-        "ts": datetime.now(UTC).isoformat(),
-        "method": method,
-        "path": path,
-        "status_code": status_code,
+        "schema_version": "1",
+        "timestamp": datetime.now(UTC).isoformat(),
         "request_id": request_id,
         "tenant": tenant,
         "subject": subject,
+        "method": method,
+        "path": path,
+        "status_code": status_code,
         "upstream": upstream,
+        "decision": decision,
     }
+    if reason:
+        event["reason"] = reason
     audit_logger.info(json.dumps(event, separators=(",", ":")))

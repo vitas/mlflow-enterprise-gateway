@@ -18,6 +18,7 @@ def _configure_gateway(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "rbac_viewer_aliases", "")
     monkeypatch.setattr(settings, "rbac_contributor_aliases", "")
     monkeypatch.setattr(settings, "rbac_admin_aliases", "")
+    monkeypatch.setattr(settings, "rbac_default_deny", False)
 
 
 def test_rbac_allows_contributor_create(monkeypatch: pytest.MonkeyPatch):
@@ -93,8 +94,10 @@ def test_rbac_deny_emits_audit_event(monkeypatch: pytest.MonkeyPatch):
     assert audit_calls[0]["status_code"] == 403
     assert audit_calls[0]["tenant"] == "team-a"
     assert audit_calls[0]["subject"] == "alice"
-    assert audit_calls[0]["upstream"] == "rbac"
+    assert audit_calls[0]["upstream"] == "policy"
     assert audit_calls[0]["request_id"] == response.headers["x-request-id"]
+    assert audit_calls[0]["schema_version"] == "1"
+    assert audit_calls[0]["decision"] == "deny"
 
 
 def test_rbac_uses_configured_role_claim(monkeypatch: pytest.MonkeyPatch):
@@ -145,3 +148,51 @@ def test_rbac_uses_aliases_for_groups(monkeypatch: pytest.MonkeyPatch):
         )
 
     assert response.status_code == 200
+
+
+def test_unknown_endpoint_allowed_when_default_deny_disabled(monkeypatch: pytest.MonkeyPatch):
+    from gateway.main import _validator
+
+    monkeypatch.setattr(settings, "rbac_default_deny", False)
+
+    async def _fake_validate_token(token: str):
+        return {"tenant_id": "team-a", "roles": ["viewer"], "sub": "alice"}
+
+    monkeypatch.setattr(_validator, "validate_token", _fake_validate_token)
+
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get("http://mlflow:5000/api/2.0/mlflow/experiments/list").mock(
+            return_value=httpx.Response(200, json={"experiments": []})
+        )
+        client = TestClient(app)
+        response = client.get(
+            "/api/2.0/mlflow/experiments/list",
+            headers={"Authorization": "Bearer token-1"},
+        )
+
+    assert response.status_code == 200
+
+
+def test_unknown_endpoint_denied_when_default_deny_enabled(monkeypatch: pytest.MonkeyPatch):
+    from gateway.main import _validator
+
+    monkeypatch.setattr(settings, "rbac_default_deny", True)
+
+    async def _fake_validate_token(token: str):
+        return {"tenant_id": "team-a", "roles": ["admin"], "sub": "alice"}
+
+    monkeypatch.setattr(_validator, "validate_token", _fake_validate_token)
+
+    with respx.mock(assert_all_called=False) as mock:
+        route = mock.get("http://mlflow:5000/api/2.0/mlflow/experiments/list").mock(
+            return_value=httpx.Response(200, json={"experiments": []})
+        )
+        client = TestClient(app)
+        response = client.get(
+            "/api/2.0/mlflow/experiments/list",
+            headers={"Authorization": "Bearer token-1"},
+        )
+
+    assert response.status_code == 403
+    assert "default deny" in response.json()["detail"]
+    assert route.called is False

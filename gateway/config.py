@@ -41,6 +41,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("GW_RBAC_ADMIN_ALIASES", "RBAC_ADMIN_ALIASES"),
     )
+    rbac_default_deny: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("GW_RBAC_DEFAULT_DENY", "RBAC_DEFAULT_DENY"),
+    )
     tenant_tag_key: str = Field(
         default="tenant",
         validation_alias=AliasChoices("GW_TENANT_TAG_KEY", "TENANT_TAG_KEY"),
