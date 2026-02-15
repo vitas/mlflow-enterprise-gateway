@@ -25,6 +25,23 @@ Self-hosted MLflow is strong for experiment tracking, but it does not provide en
 - Configurable tenant tag key (`TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY`).
 - Kubernetes/OpenShift gateway-only deployment manifests and minimal Helm chart.
 
+## Related work and positioning
+
+Many MLflow deployments use authentication-focused proxy patterns in front of MLflow (for example OIDC-enabled reverse proxies). Those approaches typically provide:
+
+- OIDC login and token/session handling
+- SSO/session protection for UI/API access
+- coarse-grained service-level access control
+
+This project focuses on governance at the MLflow API boundary:
+
+- tenant isolation for runs and model registry operations
+- role-based access control per action
+- structured audit logging for policy decisions
+- policy enforcement without modifying MLflow core
+
+The gateway is complementary to authentication proxy setups, not a replacement. Authentication can be handled by existing proxy/IdP layers, while this gateway enforces tenant-aware authorization and audit controls on MLflow API traffic.
+
 ## Quickstart
 
 ### 1) Clone and install
