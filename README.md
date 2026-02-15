@@ -22,6 +22,7 @@ Self-hosted MLflow is strong for experiment tracking, but it does not provide en
 - Minimal RBAC (`viewer`, `contributor`, `admin`) enforced in OIDC mode.
 - OIDC JWT validation with configurable tenant and role claim mapping.
 - Structured audit logging, including deny events.
+- Request correlation ID (`X-Request-ID`) in responses and audit events for traceability.
 - Configurable tenant tag key (`TENANT_TAG_KEY` / `GW_TENANT_TAG_KEY`).
 - Kubernetes/OpenShift gateway-only deployment manifests and minimal Helm chart.
 

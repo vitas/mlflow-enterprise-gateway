@@ -87,11 +87,14 @@ def test_rbac_deny_emits_audit_event(monkeypatch: pytest.MonkeyPatch):
     )
 
     assert response.status_code == 403
+    assert isinstance(response.headers.get("x-request-id"), str)
+    assert response.headers["x-request-id"]
     assert len(audit_calls) == 1
     assert audit_calls[0]["status_code"] == 403
     assert audit_calls[0]["tenant"] == "team-a"
     assert audit_calls[0]["subject"] == "alice"
     assert audit_calls[0]["upstream"] == "rbac"
+    assert audit_calls[0]["request_id"] == response.headers["x-request-id"]
 
 
 def test_rbac_uses_configured_role_claim(monkeypatch: pytest.MonkeyPatch):

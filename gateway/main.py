@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 
 from gateway.audit import log_audit_event
 from gateway.auth import AuthConfig, AuthError, JWTValidator, extract_bearer_token, extract_tenant
@@ -55,6 +57,36 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = str(uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    headers = dict(exc.headers or {})
+    request_id = getattr(request.state, "request_id", None)
+    if isinstance(request_id, str):
+        headers["X-Request-ID"] = request_id
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled gateway exception", exc_info=exc)
+    request_id = getattr(request.state, "request_id", None)
+    headers = {"X-Request-ID": request_id} if isinstance(request_id, str) else {}
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+        headers=headers,
+    )
+
+
 def _require_tenant_from_headers(request: Request) -> str:
     header = request.headers.get("x-tenant")
     if not header or not header.strip():
@@ -88,6 +120,7 @@ def _load_json_payload(raw_body: bytes) -> dict[str, Any]:
 @app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def policy_enforcement_gateway_handler(full_path: str, request: Request) -> Response:
+    request_id = getattr(request.state, "request_id", None)
     tenant = None
     subject = None
     claims: dict[str, Any] | None = None
@@ -118,6 +151,7 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
                     method=request.method,
                     path=request.url.path,
                     status_code=403,
+                    request_id=request_id if isinstance(request_id, str) else None,
                     tenant=tenant,
                     subject=subject,
                     upstream="rbac",
@@ -128,6 +162,7 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
                 method=request.method,
                 path=request.url.path,
                 status_code=401,
+                request_id=request_id if isinstance(request_id, str) else None,
                 tenant=None,
                 subject=None,
                 upstream="auth",
@@ -232,6 +267,7 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
         method=request.method,
         path=request.url.path,
         status_code=upstream_response.status_code,
+        request_id=request_id if isinstance(request_id, str) else None,
         tenant=tenant,
         subject=subject,
         upstream=upstream_url,

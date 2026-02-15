@@ -31,6 +31,8 @@ def test_authorization_ignored_in_auth_mode_off(monkeypatch: pytest.MonkeyPatch,
         )
 
     assert response.status_code == 200
+    assert isinstance(response.headers.get("x-request-id"), str)
+    assert response.headers["x-request-id"]
     assert "Authorization header ignored because AUTH_MODE=off" in caplog.text
 
 
