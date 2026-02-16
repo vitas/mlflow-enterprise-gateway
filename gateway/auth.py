@@ -30,8 +30,8 @@ class JWTValidator:
         self.timeout_seconds = timeout_seconds
         self._jwks_cache: dict[str, Any] | None = None
 
-    async def _load_jwks(self) -> dict[str, Any]:
-        if self._jwks_cache is not None:
+    async def _load_jwks(self, *, force_refresh: bool = False) -> dict[str, Any]:
+        if self._jwks_cache is not None and not force_refresh:
             return self._jwks_cache
 
         if self.config.jwks_json:
@@ -65,6 +65,13 @@ class JWTValidator:
         for jwk in keys:
             if jwk.get("kid") == kid:
                 return jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+
+        if self.config.jwks_uri:
+            jwks = await self._load_jwks(force_refresh=True)
+            keys = jwks.get("keys", [])
+            for jwk in keys:
+                if jwk.get("kid") == kid:
+                    return jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
 
         raise AuthError("Signing key not found for token kid")
 

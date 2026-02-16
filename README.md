@@ -166,7 +166,7 @@ Tenant policy and RBAC are currently enforced for:
 
 ## Roadmap
 
-See `ROADMAP.md` for next-release scope and v0.1 completion criteria.
+See `ROADMAP.md` for next-release scope and current release priorities.
 
 ## Support and community
 
