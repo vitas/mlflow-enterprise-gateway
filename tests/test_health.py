@@ -38,3 +38,13 @@ def test_readyz_returns_503_when_upstream_unavailable():
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Upstream MLflow is unavailable"
+
+
+def test_readyz_returns_503_when_upstream_returns_500():
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get("http://mlflow:5000/").mock(return_value=httpx.Response(500, text="error"))
+        client = TestClient(app)
+        response = client.get("/readyz")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Upstream MLflow is unavailable"

@@ -1,4 +1,4 @@
-__internal*.md
+docs/internal/
 
 # Python bytecode/cache
 __pycache__/

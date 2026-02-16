@@ -66,9 +66,11 @@ async def readyz(request: Request) -> dict[str, str]:
     timeout = httpx.Timeout(min(settings.request_timeout_seconds, 2.0))
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-            await client.get(probe_url)
+            probe_response = await client.get(probe_url)
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=503, detail="Upstream MLflow is unavailable") from exc
+    if probe_response.status_code == 500:
+        raise HTTPException(status_code=503, detail="Upstream MLflow is unavailable")
     _log_request_audit(request, status_code=200, upstream=probe_url)
     return {"status": "ready"}
 

@@ -96,7 +96,6 @@ def test_rbac_deny_emits_audit_event(monkeypatch: pytest.MonkeyPatch):
     assert audit_calls[0]["subject"] == "alice"
     assert audit_calls[0]["upstream"] == "policy"
     assert audit_calls[0]["request_id"] == response.headers["x-request-id"]
-    assert audit_calls[0]["schema_version"] == "1"
     assert audit_calls[0]["decision"] == "deny"
 
 

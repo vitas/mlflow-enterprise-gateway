@@ -50,15 +50,15 @@ The gateway is complementary to authentication proxy setups, not a replacement. 
 ```bash
 git clone https://github.com/<your-org>/mlflow-enterprise-gateway.git
 cd mlflow-enterprise-gateway
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -U pip
+.venv/bin/python -m pip install -e '.[dev]'
 ```
 
 ### 2) Run tests
 
 ```bash
-pytest -q
+.venv/bin/python -m pytest -q
 ```
 
 ### 3) Start local stack
