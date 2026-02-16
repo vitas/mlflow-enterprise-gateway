@@ -7,6 +7,39 @@ class TenantPayloadError(Exception):
     pass
 
 
+def _v_path(version: str, suffix: str) -> str:
+    return f"/api/{version}/mlflow/{suffix}"
+
+
+RUNS_MUTATION_SUFFIXES = {
+    "runs/update",
+    "runs/delete",
+    "runs/restore",
+    "runs/log-batch",
+    "runs/log-metric",
+    "runs/log-parameter",
+    "runs/set-tag",
+    "runs/delete-tag",
+}
+
+REGISTERED_MODEL_MUTATION_SUFFIXES = {
+    "registered-models/delete",
+    "registered-models/rename",
+    "registered-models/set-tag",
+    "registered-models/delete-tag",
+    "registered-models/set-alias",
+    "registered-models/delete-alias",
+}
+
+MODEL_VERSION_MUTATION_SUFFIXES = {
+    "model-versions/update",
+    "model-versions/delete",
+    "model-versions/transition-stage",
+    "model-versions/set-tag",
+    "model-versions/delete-tag",
+}
+
+
 def _normalize_tags_to_list(tags: Any) -> list[dict[str, Any]]:
     if tags is None:
         return []
@@ -50,6 +83,13 @@ def is_runs_get_path(path: str) -> bool:
     return path in {"/api/2.0/mlflow/runs/get", "/api/2.1/mlflow/runs/get"}
 
 
+def is_runs_mutation_path(path: str) -> bool:
+    return path in {
+        *(_v_path("2.0", suffix) for suffix in RUNS_MUTATION_SUFFIXES),
+        *(_v_path("2.1", suffix) for suffix in RUNS_MUTATION_SUFFIXES),
+    }
+
+
 def is_registered_model_create_path(path: str) -> bool:
     return path in {
         "/api/2.0/mlflow/registered-models/create",
@@ -78,10 +118,31 @@ def is_registered_model_get_path(path: str) -> bool:
     }
 
 
+def is_registered_model_mutation_path(path: str) -> bool:
+    return path in {
+        *(_v_path("2.0", suffix) for suffix in REGISTERED_MODEL_MUTATION_SUFFIXES),
+        *(_v_path("2.1", suffix) for suffix in REGISTERED_MODEL_MUTATION_SUFFIXES),
+    }
+
+
 def is_model_version_get_path(path: str) -> bool:
     return path in {
         "/api/2.0/mlflow/model-versions/get",
         "/api/2.1/mlflow/model-versions/get",
+    }
+
+
+def is_model_versions_search_path(path: str) -> bool:
+    return path in {
+        "/api/2.0/mlflow/model-versions/search",
+        "/api/2.1/mlflow/model-versions/search",
+    }
+
+
+def is_model_version_mutation_path(path: str) -> bool:
+    return path in {
+        *(_v_path("2.0", suffix) for suffix in MODEL_VERSION_MUTATION_SUFFIXES),
+        *(_v_path("2.1", suffix) for suffix in MODEL_VERSION_MUTATION_SUFFIXES),
     }
 
 

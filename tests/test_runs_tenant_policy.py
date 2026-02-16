@@ -145,3 +145,34 @@ def test_create_uses_configured_tenant_tag_key(monkeypatch: pytest.MonkeyPatch):
         )
 
     assert response.status_code == 200
+
+
+def test_log_batch_denies_access_to_other_tenant():
+    with respx.mock(assert_all_called=False) as mock:
+        preflight = mock.post("http://mlflow:5000/api/2.0/mlflow/runs/get").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "run": {
+                        "data": {
+                            "tags": [
+                                {"key": "tenant", "value": "tenant-b"},
+                            ]
+                        }
+                    }
+                },
+            )
+        )
+        mutation = mock.post("http://mlflow:5000/api/2.0/mlflow/runs/log-batch").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        client = TestClient(app)
+        response = client.post(
+            "/api/2.0/mlflow/runs/log-batch",
+            json={"run_id": "r-1", "metrics": []},
+            headers={"X-Tenant": "tenant-a"},
+        )
+
+    assert response.status_code == 403
+    assert preflight.called is True
+    assert mutation.called is False

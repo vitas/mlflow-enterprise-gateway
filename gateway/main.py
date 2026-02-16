@@ -24,11 +24,14 @@ from gateway.mlflow.tenant import (
     extract_tenant_tag_from_run_response,
     is_model_version_create_path,
     is_model_version_get_path,
+    is_model_version_mutation_path,
     is_registered_model_create_path,
     is_registered_model_get_path,
+    is_registered_model_mutation_path,
     is_registered_models_search_path,
     is_runs_create_path,
     is_runs_get_path,
+    is_runs_mutation_path,
     is_runs_search_path,
 )
 from gateway.rbac import RBACError, enforce_rbac
@@ -169,6 +172,22 @@ def _load_json_payload(raw_body: bytes) -> dict[str, Any]:
     return payload
 
 
+def _api_version_for_path(path: str) -> str:
+    return "2.1" if "/api/2.1/" in path else "2.0"
+
+
+def _extract_field_from_request(
+    payload: dict[str, Any], request: Request, field_name: str
+) -> str | None:
+    value = payload.get(field_name)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    query_value = request.query_params.get(field_name)
+    if isinstance(query_value, str) and query_value.strip():
+        return query_value.strip()
+    return None
+
+
 @app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def policy_enforcement_gateway_handler(full_path: str, request: Request) -> Response:
@@ -261,37 +280,89 @@ async def policy_enforcement_gateway_handler(full_path: str, request: Request) -
     timeout = httpx.Timeout(settings.request_timeout_seconds)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+        preflight_endpoint = None
+        preflight_body: bytes | None = None
         response_tenant_extractor = None
-        if is_runs_get_path(request_path):
-            response_tenant_extractor = lambda payload: extract_tenant_tag_from_run_response(
-                payload, settings.tenant_tag_key
-            )
-        elif is_registered_model_get_path(request_path):
-            response_tenant_extractor = lambda payload: extract_tenant_tag_from_registered_model_response(
-                payload, settings.tenant_tag_key
-            )
-        elif is_model_version_get_path(request_path):
-            response_tenant_extractor = lambda payload: extract_tenant_tag_from_model_version_response(
-                payload, settings.tenant_tag_key
-            )
 
-        if response_tenant_extractor is not None:
+        if (
+            is_runs_get_path(request_path)
+            or is_runs_mutation_path(request_path)
+            or is_registered_model_get_path(request_path)
+            or is_registered_model_mutation_path(request_path)
+            or is_model_version_get_path(request_path)
+            or is_model_version_mutation_path(request_path)
+        ):
+            lookup_payload = _load_json_payload(body)
+            version = _api_version_for_path(request_path)
+
+            if is_runs_get_path(request_path) or is_runs_mutation_path(request_path):
+                run_id = _extract_field_from_request(lookup_payload, request, "run_id")
+                if not run_id:
+                    raise HTTPException(status_code=400, detail="Missing required field: run_id")
+                preflight_endpoint = f"/api/{version}/mlflow/runs/get"
+                preflight_body = json.dumps({"run_id": run_id}).encode()
+                response_tenant_extractor = lambda payload: extract_tenant_tag_from_run_response(
+                    payload, settings.tenant_tag_key
+                )
+            elif is_registered_model_get_path(request_path) or is_registered_model_mutation_path(
+                request_path
+            ):
+                model_name = _extract_field_from_request(lookup_payload, request, "name")
+                if not model_name:
+                    raise HTTPException(status_code=400, detail="Missing required field: name")
+                preflight_endpoint = f"/api/{version}/mlflow/registered-models/get"
+                preflight_body = json.dumps({"name": model_name}).encode()
+                response_tenant_extractor = (
+                    lambda payload: extract_tenant_tag_from_registered_model_response(
+                        payload, settings.tenant_tag_key
+                    )
+                )
+            elif is_model_version_get_path(request_path) or is_model_version_mutation_path(
+                request_path
+            ):
+                model_name = _extract_field_from_request(lookup_payload, request, "name")
+                model_version = _extract_field_from_request(lookup_payload, request, "version")
+                if not model_name:
+                    raise HTTPException(status_code=400, detail="Missing required field: name")
+                if not model_version:
+                    raise HTTPException(status_code=400, detail="Missing required field: version")
+                preflight_endpoint = f"/api/{version}/mlflow/model-versions/get"
+                preflight_body = json.dumps({"name": model_name, "version": model_version}).encode()
+                response_tenant_extractor = lambda payload: extract_tenant_tag_from_model_version_response(
+                    payload, settings.tenant_tag_key
+                )
+
+        if preflight_endpoint is not None and response_tenant_extractor is not None and preflight_body is not None:
+            preflight_url = f"{settings.target_base_url.rstrip('/')}{preflight_endpoint}"
             preflight_response = await client.request(
-                method=request.method,
-                url=upstream_url,
-                params=request.query_params,
+                method="POST",
+                url=preflight_url,
                 headers=forward_headers,
-                content=body,
+                content=preflight_body,
             )
             if preflight_response.status_code == 200:
                 try:
-                    run_payload = preflight_response.json()
+                    resource_payload = preflight_response.json()
                 except ValueError as exc:
                     raise HTTPException(status_code=502, detail="Invalid upstream response") from exc
-                resource_tenant = response_tenant_extractor(run_payload)
+                resource_tenant = response_tenant_extractor(resource_payload)
                 if resource_tenant != tenant:
                     raise HTTPException(status_code=403, detail="Resource is not accessible for tenant")
-            upstream_response = preflight_response
+
+            if (
+                is_runs_get_path(request_path)
+                or is_registered_model_get_path(request_path)
+                or is_model_version_get_path(request_path)
+            ):
+                upstream_response = preflight_response
+            else:
+                upstream_response = await client.request(
+                    method=request.method,
+                    url=upstream_url,
+                    params=request.query_params,
+                    headers=forward_headers,
+                    content=body,
+                )
         else:
             upstream_response = await client.request(
                 method=request.method,

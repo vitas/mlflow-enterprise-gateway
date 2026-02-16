@@ -125,3 +125,60 @@ def test_model_version_get_denies_access_to_other_tenant():
 
     assert response.status_code == 403
     assert route.call_count == 1
+
+
+def test_registered_model_delete_denies_access_to_other_tenant():
+    with respx.mock(assert_all_called=False) as mock:
+        preflight = mock.post("http://mlflow:5000/api/2.0/mlflow/registered-models/get").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "registered_model": {
+                        "name": "model-a",
+                        "tags": [{"key": "tenant", "value": "tenant-b"}],
+                    }
+                },
+            )
+        )
+        mutation = mock.post("http://mlflow:5000/api/2.0/mlflow/registered-models/delete").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        client = TestClient(app)
+        response = client.post(
+            "/api/2.0/mlflow/registered-models/delete",
+            json={"name": "model-a"},
+            headers={"X-Tenant": "tenant-a"},
+        )
+
+    assert response.status_code == 403
+    assert preflight.called is True
+    assert mutation.called is False
+
+
+def test_model_version_transition_stage_denies_access_to_other_tenant():
+    with respx.mock(assert_all_called=False) as mock:
+        preflight = mock.post("http://mlflow:5000/api/2.0/mlflow/model-versions/get").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "model_version": {
+                        "name": "model-a",
+                        "version": "1",
+                        "tags": [{"key": "tenant", "value": "tenant-b"}],
+                    }
+                },
+            )
+        )
+        mutation = mock.post("http://mlflow:5000/api/2.0/mlflow/model-versions/transition-stage").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        client = TestClient(app)
+        response = client.post(
+            "/api/2.0/mlflow/model-versions/transition-stage",
+            json={"name": "model-a", "version": "1", "stage": "Production"},
+            headers={"X-Tenant": "tenant-a"},
+        )
+
+    assert response.status_code == 403
+    assert preflight.called is True
+    assert mutation.called is False

@@ -6,8 +6,12 @@ from gateway.rbac import RBACError, enforce_rbac, extract_effective_role, requir
 def test_required_role_mapping():
     assert required_role_for_request("/api/2.0/mlflow/runs/create") == "contributor"
     assert required_role_for_request("/api/2.0/mlflow/runs/get") == "viewer"
+    assert required_role_for_request("/api/2.0/mlflow/runs/log-batch") == "contributor"
     assert required_role_for_request("/api/2.0/mlflow/registered-models/create") == "contributor"
     assert required_role_for_request("/api/2.0/mlflow/registered-models/search") == "viewer"
+    assert required_role_for_request("/api/2.0/mlflow/registered-models/delete") == "contributor"
+    assert required_role_for_request("/api/2.0/mlflow/model-versions/search") == "viewer"
+    assert required_role_for_request("/api/2.0/mlflow/model-versions/transition-stage") == "contributor"
     assert required_role_for_request("/api/2.0/mlflow/experiments/list") is None
 
 

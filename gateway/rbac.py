@@ -5,11 +5,15 @@ from typing import Any
 from gateway.mlflow.tenant import (
     is_model_version_create_path,
     is_model_version_get_path,
+    is_model_version_mutation_path,
+    is_model_versions_search_path,
     is_registered_model_create_path,
     is_registered_model_get_path,
+    is_registered_model_mutation_path,
     is_registered_models_search_path,
     is_runs_create_path,
     is_runs_get_path,
+    is_runs_mutation_path,
     is_runs_search_path,
 )
 
@@ -60,11 +64,23 @@ def _collect_role_candidates(claims: dict[str, Any], role_claims: list[str]) -> 
 
 
 def required_role_for_request(path: str) -> str | None:
-    if is_runs_create_path(path) or is_registered_model_create_path(path) or is_model_version_create_path(path):
+    if (
+        is_runs_create_path(path)
+        or is_runs_mutation_path(path)
+        or is_registered_model_create_path(path)
+        or is_registered_model_mutation_path(path)
+        or is_model_version_create_path(path)
+        or is_model_version_mutation_path(path)
+    ):
         return "contributor"
     if is_runs_get_path(path) or is_runs_search_path(path):
         return "viewer"
-    if is_registered_model_get_path(path) or is_registered_models_search_path(path) or is_model_version_get_path(path):
+    if (
+        is_registered_model_get_path(path)
+        or is_registered_models_search_path(path)
+        or is_model_version_get_path(path)
+        or is_model_versions_search_path(path)
+    ):
         return "viewer"
     return None
 

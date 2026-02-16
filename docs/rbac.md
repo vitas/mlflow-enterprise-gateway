@@ -24,16 +24,24 @@ Role strength order:
 | `/api/2.1/mlflow/runs/get` | `viewer` |
 | `/api/2.0/mlflow/runs/search` | `viewer` |
 | `/api/2.1/mlflow/runs/search` | `viewer` |
+| `/api/2.0/mlflow/runs/update` (and run mutation endpoints: `delete`, `restore`, `log-batch`, `log-metric`, `log-parameter`, `set-tag`, `delete-tag`) | `contributor` |
+| `/api/2.1/mlflow/runs/update` (and run mutation endpoints: `delete`, `restore`, `log-batch`, `log-metric`, `log-parameter`, `set-tag`, `delete-tag`) | `contributor` |
 | `/api/2.0/mlflow/registered-models/create` | `contributor` |
 | `/api/2.1/mlflow/registered-models/create` | `contributor` |
 | `/api/2.0/mlflow/registered-models/get` | `viewer` |
 | `/api/2.1/mlflow/registered-models/get` | `viewer` |
 | `/api/2.0/mlflow/registered-models/search` | `viewer` |
 | `/api/2.1/mlflow/registered-models/search` | `viewer` |
+| `/api/2.0/mlflow/registered-models/<mutation>` (`delete`, `rename`, `set-tag`, `delete-tag`, `set-alias`, `delete-alias`) | `contributor` |
+| `/api/2.1/mlflow/registered-models/<mutation>` (`delete`, `rename`, `set-tag`, `delete-tag`, `set-alias`, `delete-alias`) | `contributor` |
 | `/api/2.0/mlflow/model-versions/create` | `contributor` |
 | `/api/2.1/mlflow/model-versions/create` | `contributor` |
 | `/api/2.0/mlflow/model-versions/get` | `viewer` |
 | `/api/2.1/mlflow/model-versions/get` | `viewer` |
+| `/api/2.0/mlflow/model-versions/search` | `viewer` |
+| `/api/2.1/mlflow/model-versions/search` | `viewer` |
+| `/api/2.0/mlflow/model-versions/<mutation>` (`update`, `delete`, `transition-stage`, `set-tag`, `delete-tag`) | `contributor` |
+| `/api/2.1/mlflow/model-versions/<mutation>` (`update`, `delete`, `transition-stage`, `set-tag`, `delete-tag`) | `contributor` |
 
 ### Notes
 
