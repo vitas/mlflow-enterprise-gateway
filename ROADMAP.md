@@ -1,28 +1,24 @@
 # Roadmap (Next Release)
 
-## Next Release Goal: v0.1.0 Public Open Source Release
+## Current Baseline: v0.2.0
 
-Deliver a functionally complete, usable first public release that platform teams can deploy, validate, and operate without modifying MLflow.
+Current release baseline is `v0.2.0`, with gateway policy enforcement, readiness/liveness probes, structured audit schema v1, and expanded tenant/RBAC coverage for runs and model registry mutation paths.
 
-### v0.1 functional scope (must be complete)
+## Next Release Goal
 
-- Tenant isolation for MLflow Runs and Model Registry paths currently covered by gateway policies.
-- Minimal RBAC with tenant-scoped roles: `viewer`, `contributor`, `admin`.
-- Audit logging for allowed and denied requests at the gateway enforcement boundary.
-- Helm chart for Kubernetes deployment of the gateway.
-- Enterprise documentation: integration guide and RBAC guide.
-- Runnable demo that proves tenant isolation in a local environment.
+Deliver a production-ready hardening increment on top of `v0.2.0` focused on safe operations, stricter deployment defaults, and release discipline.
 
-## Operational readiness for v0.1
+## Priorities
 
-- Compatibility matrix for supported MLflow and Python versions.
-- Explicit list of supported and unsupported MLflow endpoints.
-- Operational runbook for health/readiness checks and common failure modes.
-- Production logging guidance (audit usage, correlation patterns, retention expectations).
-- Backward-compatibility policy for configuration and behavior changes.
-- Test hardening for policy edge cases and regression stability.
+- Provide a production profile that exposes only gateway and keeps MLflow internal.
+- Default docs and examples to OIDC mode for production paths.
+- Keep demo/dev profile explicit and separate.
+- Close highest-risk uncovered API paths based on real usage patterns.
+- Publish compatibility matrix (MLflow/Python/Kubernetes targets).
+- Add operator runbook for startup failures, probe behavior, and incident handling.
 
-## Out of scope for v0.1
+
+## Out of scope (unchanged)
 
 - External policy engine integration (for example OPA).
 - Direct LDAP integration in the gateway.

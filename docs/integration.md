@@ -49,6 +49,17 @@ The gateway supports identity integration through OIDC/OAuth2 JWT validation. Ty
 - Azure AD / Entra ID
 - Okta (via standard OIDC configuration)
 
+### Optional SSO proxy pattern
+
+If browser SSO/session handling is required, deploy an auth proxy (for example `oauth2-proxy`) in front of the gateway:
+
+- auth proxy responsibility: login flow, session/cookie handling, IdP redirect
+- gateway responsibility: tenant-aware authorization, RBAC, and audit enforcement
+
+Reference flow:
+
+`User -> Ingress/Route -> oauth2-proxy -> Gateway (PEP) -> MLflow`
+
 Integration is configured with existing gateway env vars (`GW_OIDC_ISSUER`, `GW_JWKS_URI`, `GW_OIDC_AUDIENCE`, `GW_ROLE_CLAIM`, `GW_TENANT_CLAIM`, and RBAC alias settings when needed).
 
 ### LDAP / Active Directory integration model

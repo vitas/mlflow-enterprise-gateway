@@ -1,8 +1,19 @@
+Enterprise multi-tenant security, RBAC, and audit layer for self-hosted MLflow.
+
 # MLflow Multi-Tenancy & Governance Gateway
 
 Policy Enforcement Gateway (PEP) for self-hosted MLflow. It adds tenant isolation, RBAC, audit logging, and OIDC-based IAM integration without modifying MLflow itself. The gateway sits in front of MLflow API/UI traffic and enforces policy before requests reach MLflow.
 
 Self-hosted MLflow is strong for experiment tracking, but it does not provide enterprise multi-tenancy boundaries, built-in RBAC enforcement, centralized audit control, or robust IAM integration patterns out of the box. This project addresses that gap with an extension-layer gateway.
+
+## When you need this
+
+You likely need this gateway if:
+
+- you run MLflow in a shared enterprise environment
+- multiple teams or tenants use the same MLflow instance
+- security, RBAC, and auditability are required for compliance
+- direct MLflow exposure is not allowed by policy
 
 ## Why this exists
 
@@ -42,6 +53,19 @@ This project focuses on governance at the MLflow API boundary:
 - policy enforcement without modifying MLflow core
 
 The gateway is complementary to authentication proxy setups, not a replacement. Authentication can be handled by existing proxy/IdP layers, while this gateway enforces tenant-aware authorization and audit controls on MLflow API traffic.
+
+## SSO deployment option (oauth2-proxy)
+
+For enterprise SSO, you can place `oauth2-proxy` in front of this gateway:
+
+- `oauth2-proxy` handles login, SSO session, and IdP interaction.
+- this gateway handles tenant isolation, RBAC, and audit controls.
+
+Recommended request path:
+
+`User -> Ingress/Route -> oauth2-proxy -> MLflow Governance Gateway -> MLflow`
+
+This gives a free/open-source SSO path while keeping governance enforcement at the MLflow API boundary.
 
 ## Quickstart
 
