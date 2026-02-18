@@ -169,16 +169,27 @@ flowchart TD
 
 Tenant policy and RBAC are currently enforced for:
 
-- Runs:
-  - `/api/2.0/mlflow/runs/create` and `/api/2.1/mlflow/runs/create`
-  - `/api/2.0/mlflow/runs/get` and `/api/2.1/mlflow/runs/get`
-  - `/api/2.0/mlflow/runs/search` and `/api/2.1/mlflow/runs/search`
-- Model Registry:
-  - `/api/2.0/mlflow/registered-models/create` and `/api/2.1/mlflow/registered-models/create`
-  - `/api/2.0/mlflow/registered-models/get` and `/api/2.1/mlflow/registered-models/get`
-  - `/api/2.0/mlflow/registered-models/search` and `/api/2.1/mlflow/registered-models/search`
-  - `/api/2.0/mlflow/model-versions/create` and `/api/2.1/mlflow/model-versions/create`
-  - `/api/2.0/mlflow/model-versions/get` and `/api/2.1/mlflow/model-versions/get`
+- Runs (`/api/2.0` and `/api/2.1`):
+  - `runs/create`
+  - `runs/get`
+  - `runs/search`
+  - `runs/update`, `runs/delete`, `runs/restore`
+  - `runs/log-batch`, `runs/log-metric`, `runs/log-parameter`
+  - `runs/set-tag`, `runs/delete-tag`
+- Registered models (`/api/2.0` and `/api/2.1`):
+  - `registered-models/create`
+  - `registered-models/get`
+  - `registered-models/search`
+  - `registered-models/delete`, `registered-models/rename`
+  - `registered-models/set-tag`, `registered-models/delete-tag`
+  - `registered-models/set-alias`, `registered-models/delete-alias`
+- Model versions (`/api/2.0` and `/api/2.1`):
+  - `model-versions/create`
+  - `model-versions/get`
+  - `model-versions/search`
+  - `model-versions/update`, `model-versions/delete`
+  - `model-versions/transition-stage`
+  - `model-versions/set-tag`, `model-versions/delete-tag`
 
 ## Docs
 
